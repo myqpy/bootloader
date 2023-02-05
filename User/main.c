@@ -88,6 +88,12 @@ struct TerminalParameters
 	unsigned char version[5];
 };
 
+struct RegisterID
+{
+	unsigned char PhoneNumber[20];
+	unsigned char TerminalId[20];
+};
+
 uint32_t FLASH_PagesMask(__IO uint32_t Size)
 {
   uint32_t pagenumber = 0x0;
@@ -199,7 +205,7 @@ int main(void)
 	unsigned char read_buf[128] = {0};
 	unsigned char write_buf[128] = {0};
 	struct TerminalParameters terminal_parameters;
-	
+	struct RegisterID register_id;
 	USART3_Config(115200);
 	USART1_Config(115200);
 	
@@ -207,7 +213,17 @@ int main(void)
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->       BOOTLOADER run!     \r\n");
 	printf("DEBUG-->                           \r\n");
-	printf("DEBUG-->---------------------------\r\n");
+	printf("DEBUG-->---------------------------\r\n");	
+	
+	memset(register_id.PhoneNumber,0, 12);
+	memcpy(register_id.PhoneNumber, "100221000201" , 12);
+	
+	memset(register_id.TerminalId,0, 8);
+	memcpy(register_id.TerminalId, "1000201" , 8);
+	
+	memset(write_buf,0,sizeof(write_buf));
+	memcpy(write_buf, &register_id, sizeof(register_id));
+	FLASH_WriteByte(((uint32_t)0x0803b800) , write_buf , sizeof(write_buf));
 	
 	
 	Internal_ReadFlash((uint32_t)0x0803c000 , read_buf , sizeof(read_buf));
