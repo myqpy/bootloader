@@ -52,7 +52,7 @@ struct TerminalParameters
 	unsigned int HeartBeatInterval;
 	
 	//STRING, ??????,IP ???
-	unsigned char MainServerAddress[16];
+	unsigned char MainServerAddress[50];
 
 	//DWORD, ??? TCP ??		
 	unsigned int ServerPort;
@@ -202,8 +202,6 @@ void FLASH_WriteByte(uint32_t addr , uint8_t *p , uint16_t Byte_Num)
 int main(void)
 {
 	u8 retry=5;
-	unsigned char read_buf[128] = {0};
-	unsigned char write_buf[128] = {0};
 	struct TerminalParameters terminal_parameters;
 	struct RegisterID register_id;
 	USART3_Config(115200);
@@ -216,20 +214,20 @@ int main(void)
 	printf("DEBUG-->---------------------------\r\n");	
 	
 	memset(register_id.PhoneNumber,0, 12);
-	memcpy(register_id.PhoneNumber, "100221000201" , 12);
+	memcpy(register_id.PhoneNumber, "100221000206" , 12);
 	
 	memset(register_id.TerminalId,0, 8);
-	memcpy(register_id.TerminalId, "1000201" , 8);
+	memcpy(register_id.TerminalId, "1000206" , 8);
+
+	FLASH_WriteByte(((uint32_t)0x0803b800) ,(uint8_t *) &register_id , sizeof(register_id));
 	
-	memset(write_buf,0,sizeof(write_buf));
-	memcpy(write_buf, &register_id, sizeof(register_id));
-	FLASH_WriteByte(((uint32_t)0x0803b800) , write_buf , sizeof(write_buf));
-	
-	
-	Internal_ReadFlash((uint32_t)0x0803c000 , read_buf , sizeof(read_buf));
-	memset(&terminal_parameters,0,sizeof(terminal_parameters));
-	memcpy(&terminal_parameters, read_buf, sizeof(read_buf));
+
+	Internal_ReadFlash((uint32_t) UpdateFlagAddress , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
+//	memcpy(&terminal_parameters.MainServerAddress,"121.5.140.126", sizeof("121.5.140.126"));
+//	FLASH_WriteByte((uint32_t)UpdateFlagAddress ,(uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
+
 	printf("UpdateFlag : 0x%08lX    \r\n",terminal_parameters.bootLoaderFlag);
+//	terminal_parameters.bootLoaderFlag == 0xAAAAAAAA
 //	if ((*(__IO uint32_t*)UpdateFlagAddress) == 0xAAAAAAAA)
 	if (terminal_parameters.bootLoaderFlag == 0xAAAAAAAA)
 	{
@@ -245,11 +243,8 @@ int main(void)
 //				FLASH_Lock();
 //				__set_PRIMASK(0);
 				terminal_parameters.bootLoaderFlag = 0xFFFFFFFF;
-	
-				memset(write_buf,0,sizeof(write_buf));
-				memcpy(write_buf, &terminal_parameters, sizeof(terminal_parameters));
 
-				FLASH_WriteByte(UpdateFlagAddress , write_buf , sizeof(write_buf));
+				FLASH_WriteByte(UpdateFlagAddress , (uint8_t*)&terminal_parameters , sizeof(terminal_parameters));
 				__set_FAULTMASK(1); 
 				NVIC_SystemReset();
 				break;
