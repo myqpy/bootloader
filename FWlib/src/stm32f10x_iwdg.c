@@ -217,9 +217,9 @@ FlagStatus IWDG_GetFlagStatus(uint16_t IWDG_FLAG)
   }
   else
   {
-		terminal_parameters.bootLoaderFlag = 0XCCCCCCCC;
+//		terminal_parameters.bootLoaderFlag = 0XCCCCCCCC;
 
-		FLASH_WriteByte((uint32_t)0x08038000 , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));	
+//		FLASH_WriteByte((uint32_t)0x08038000 , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));	
 		
     bitstatus = RESET;
   }

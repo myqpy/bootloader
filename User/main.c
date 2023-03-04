@@ -37,12 +37,13 @@ bootload   app1       app2       data      total
  0x5000   0x19000    0x19000    0x9000     40000
    20k      100k      100k       36k        256k
 */
-#define BL_SIZE 							0x4000
-#define APP_SIZE 							0x19000
-#define ApplicationAddress    (0x08000000+BL_SIZE)
-//#define UpdateFlagAddress		(ApplicationAddress-4)//Éý¼¶±êÖ¾Î»´æ´¢µØÖ·£¬BootLoaderÇøÓò×îºóÒ»¸öword
-#define UpdateFlagAddress 		0x08038000
-//#define FileSizeAddress				(ApplicationAddress-8)//ÎÄ¼þ´óÐ¡ µØÖ·ÎªbootloaderµÄµ¹ÊýµÚ¶þ¸öword
+#define BL_SIZE 								0x4000
+#define APP_SIZE 								0x10000
+#define Application1Address    	(0x08000000+BL_SIZE)
+//#define Application2Address    	Application1Address+APP_SIZE
+#define Application2Address    	(Application1Address+APP_SIZE)
+#define Application3Address    	(Application2Address+APP_SIZE)
+#define DataStorageAddress			(Application3Address+APP_SIZE)
 
 FLASH_Status FLASH_ProgramOptionByteData(uint32_t Address, uint8_t Data);
 
@@ -61,7 +62,7 @@ struct TerminalParameters
 	// DWORD, ????????
 	unsigned int DefaultTimeReportTimeInterval;
 
-	// DWORD, ??????, < 180°.
+	// DWORD, ??????, < 180?.
 	unsigned int CornerPointRetransmissionAngle;
 
 	// DWORD, ????, km/h.
@@ -112,8 +113,8 @@ uint32_t FLASH_PagesMask(__IO uint32_t Size)
 u8 Copy_APP2_TO_APP1(void)
 {
 	uint32_t i=0,NumOfWord=0;
-	uint32_t ReadAddress = ApplicationAddress + APP_SIZE;
-	uint32_t WriteAddress = ApplicationAddress;
+	uint32_t ReadAddress = Application3Address;
+	uint32_t WriteAddress = Application2Address;
 	
 //	printf("ReadAddress : 0x%08X    \r\n",ReadAddress);
 //	printf("WriteAddress : 0x%08X    \r\n",WriteAddress);
@@ -125,13 +126,13 @@ u8 Copy_APP2_TO_APP1(void)
 //	FileSize = *(__IO uint32_t*)FileSizeAddress;
 
 	//NbrOfPage = FLASH_PagesMask(0x19000);
-	FileSize = 0x19000;
+	FileSize = 0x10000;
 	NbrOfPage = 50;
 	
 	
 	for (EraseCounter = 0; (EraseCounter < NbrOfPage) && (FLASHStatus == FLASH_COMPLETE); EraseCounter++)
 	{
-		FLASHStatus = FLASH_ErasePage(ApplicationAddress + (PAGE_SIZE * EraseCounter));
+		FLASHStatus = FLASH_ErasePage(Application2Address + (PAGE_SIZE * EraseCounter));
 	}
 	
 	if(FLASHStatus != FLASH_COMPLETE)
@@ -170,7 +171,7 @@ u8 Copy_APP2_TO_APP1(void)
 
 /*******************************************************************************
 * Function Name  : main
-* Description    : Ö÷º¯Êý
+* Description    : ??????
 * Input          : None.
 * Return         : None.
 *******************************************************************************/
@@ -181,15 +182,15 @@ int main(void)
 	USART3_Config(115200);
 	USART1_Config(115200);
 	
-	
-	IWDG_Init(6,4095); //Óë·ÖÆµÊýÎª64,ÖØÔØÖµÎª625,Òç³öÊ±¼äÎª1s
+
+	IWDG_Init(6,4095); //???????64,??????625,???????1s
 	printf("DEBUG-->---------------------------\r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->       BOOTLOADER run!     \r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->---------------------------\r\n");	
 
-	Internal_ReadFlash((uint32_t) UpdateFlagAddress , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
+	Internal_ReadFlash((uint32_t) DataStorageAddress , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
 	
 
 	printf("UpdateFlag : 0x%08lX    \r\n",terminal_parameters.bootLoaderFlag);
@@ -201,7 +202,7 @@ int main(void)
 			if(Copy_APP2_TO_APP1())
 			{
 				terminal_parameters.bootLoaderFlag = 0xFFFFFFFF;
-				FLASH_WriteByte(UpdateFlagAddress , (uint8_t*)&terminal_parameters , sizeof(terminal_parameters));
+				FLASH_WriteByte(DataStorageAddress , (uint8_t*)&terminal_parameters , sizeof(terminal_parameters));
 				__set_FAULTMASK(1); 
 				NVIC_SystemReset();
 				break;
@@ -212,17 +213,52 @@ int main(void)
 	{
 		printf("no update \r\n");
 	}
-		
-	if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
+	
+	if ((RCC_GetFlagStatus(RCC_FLAG_PORRST) != RESET)||(RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET)) //ÉÏµç¸´Î»
 	{
-		printf("DEBUG-->  Jump to APP!  	\r\n");
-		/* Jump to user application */
-		JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
-		Jump_To_Application = (pFunction) JumpAddress;
-		/* Initialize user application's Stack Pointer */
-		__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-		Jump_To_Application();
+		RCC_ClearFlag();
+		printf("\r\nÉÏµç¸´Î»»òÈí¼þ¸´Î»\r\n");
+		if (((*(__IO uint32_t*)Application2Address) & 0x2FFE0000 ) == 0x20000000)
+		{
+			printf("DEBUG-->  Jump to APP2!  	\r\n");
+			/* Jump to user application */
+			JumpAddress = *(__IO uint32_t*) (Application2Address + 4);
+			Jump_To_Application = (pFunction) JumpAddress;
+			/* Initialize user application's Stack Pointer */
+			__set_MSP(*(__IO uint32_t*) Application2Address);
+			Jump_To_Application();
+		}
 	}
+//	if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET) //Èí¼þ¸´Î»
+//	{
+//		printf("\r\nÈí¼þ¸´Î» \r\n");
+//	}
+	if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) != RESET) //¿´ÃÅ¹·¸´Î»
+	{
+		RCC_ClearFlag();
+		printf("\r\n¿´ÃÅ¹·¸´Î»\r\n");
+		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
+		{
+			printf("DEBUG-->  Jump to APP1!  	\r\n");
+			/* Jump to user application */
+			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
+			Jump_To_Application = (pFunction) JumpAddress;
+			/* Initialize user application's Stack Pointer */
+			__set_MSP(*(__IO uint32_t*) Application1Address);
+			Jump_To_Application();
+		}
+	}
+//	RCC_ClearFlag();
+//	if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
+//	{
+//		printf("DEBUG-->  Jump to APP!  	\r\n");
+//		/* Jump to user application */
+//		JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
+//		Jump_To_Application = (pFunction) JumpAddress;
+//		/* Initialize user application's Stack Pointer */
+//		__set_MSP(*(__IO uint32_t*) ApplicationAddress);
+//		Jump_To_Application();
+//	}
 	
 	while(1)
 	{
