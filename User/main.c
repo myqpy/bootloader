@@ -1,7 +1,8 @@
 #include "main.h"
 #include "usart.h"
 #include "stm32f10x_flash.h"
-#include "string.h"
+#include "iwdg.h"
+#include "bsp_internal_flash.h"   
 
 typedef  void (*pFunction)(void);
 pFunction Jump_To_Application;
@@ -36,11 +37,11 @@ bootload   app1       app2       data      total
  0x5000   0x19000    0x19000    0x9000     40000
    20k      100k      100k       36k        256k
 */
-#define BL_SIZE 							0x5000
+#define BL_SIZE 							0x4000
 #define APP_SIZE 							0x19000
 #define ApplicationAddress    (0x08000000+BL_SIZE)
 //#define UpdateFlagAddress		(ApplicationAddress-4)//升级标志位存储地址，BootLoader区域最后一个word
-#define UpdateFlagAddress 		0x0803c000
+#define UpdateFlagAddress 		0x08038000
 //#define FileSizeAddress				(ApplicationAddress-8)//文件大小 地址为bootloader的倒数第二个word
 
 FLASH_Status FLASH_ProgramOptionByteData(uint32_t Address, uint8_t Data);
@@ -86,10 +87,8 @@ struct TerminalParameters
 	
 	//STRING, ???
 	unsigned char version[5];
-};
-
-struct RegisterID
-{
+	
+	
 	unsigned char PhoneNumber[20];
 	unsigned char TerminalId[20];
 };
@@ -169,30 +168,6 @@ u8 Copy_APP2_TO_APP1(void)
 	return 1;
 }
 
-void Internal_ReadFlash(uint32_t addr , uint8_t *p , uint16_t Byte_Num)
-{
-	while(Byte_Num--)
-	{
-	 *(p++)=*((uint8_t*)addr++);
-	}
-}
-
-void FLASH_WriteByte(uint32_t addr , uint8_t *p , uint16_t Byte_Num)
-{
-		uint32_t HalfWord;
-		Byte_Num = Byte_Num/2;
-		FLASH_Unlock();
-		FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_WRPRTERR | FLASH_FLAG_PGERR | FLASH_FLAG_BSY | FLASH_FLAG_OPTERR);
-		FLASH_ErasePage(addr);
-		while(Byte_Num --)
-		{
-						HalfWord=*(p++);
-						HalfWord|=*(p++)<<8;
-						FLASH_ProgramHalfWord(addr, HalfWord);
-						addr += 2;
-		}
-		FLASH_Lock();
-}
 /*******************************************************************************
 * Function Name  : main
 * Description    : 主函数
@@ -203,32 +178,21 @@ int main(void)
 {
 	u8 retry=5;
 	struct TerminalParameters terminal_parameters;
-	struct RegisterID register_id;
 	USART3_Config(115200);
 	USART1_Config(115200);
 	
+	
+	IWDG_Init(6,4095); //与分频数为64,重载值为625,溢出时间为1s
 	printf("DEBUG-->---------------------------\r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->       BOOTLOADER run!     \r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->---------------------------\r\n");	
-	
-	memset(register_id.PhoneNumber,0, 12);
-	memcpy(register_id.PhoneNumber, "100221000206" , 12);
-	
-	memset(register_id.TerminalId,0, 8);
-	memcpy(register_id.TerminalId, "1000206" , 8);
-
-	FLASH_WriteByte(((uint32_t)0x0803b800) ,(uint8_t *) &register_id , sizeof(register_id));
-	
 
 	Internal_ReadFlash((uint32_t) UpdateFlagAddress , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
-//	memcpy(&terminal_parameters.MainServerAddress,"121.5.140.126", sizeof("121.5.140.126"));
-//	FLASH_WriteByte((uint32_t)UpdateFlagAddress ,(uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
+	
 
 	printf("UpdateFlag : 0x%08lX    \r\n",terminal_parameters.bootLoaderFlag);
-//	terminal_parameters.bootLoaderFlag == 0xAAAAAAAA
-//	if ((*(__IO uint32_t*)UpdateFlagAddress) == 0xAAAAAAAA)
 	if (terminal_parameters.bootLoaderFlag == 0xAAAAAAAA)
 	{
 		printf("need to update \r\n");
@@ -236,14 +200,7 @@ int main(void)
 		{
 			if(Copy_APP2_TO_APP1())
 			{
-//				__set_PRIMASK(1); 
-//				FLASH_Unlock();
-//				FLASH_ClearFlag(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
-//				FLASH_ErasePage(UpdateFlagAddress);//清除升级标志位，写0XFFFFFFFF必须用擦除命令
-//				FLASH_Lock();
-//				__set_PRIMASK(0);
 				terminal_parameters.bootLoaderFlag = 0xFFFFFFFF;
-
 				FLASH_WriteByte(UpdateFlagAddress , (uint8_t*)&terminal_parameters , sizeof(terminal_parameters));
 				__set_FAULTMASK(1); 
 				NVIC_SystemReset();

@@ -21,7 +21,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f10x_iwdg.h"
-
+#include "bsp_internal_flash.h"   
 /** @addtogroup STM32F10x_StdPeriph_Driver
   * @{
   */
@@ -49,6 +49,53 @@
 #define KR_KEY_Reload    ((uint16_t)0xAAAA)
 #define KR_KEY_Enable    ((uint16_t)0xCCCC)
 
+
+
+struct TerminalParameters
+{
+	// DWORD, ????????(s).
+	unsigned int HeartBeatInterval;
+	
+	//STRING, ??????,IP ???
+	unsigned char MainServerAddress[50];
+
+	//DWORD, ??? TCP ??		
+	unsigned int ServerPort;
+
+	// DWORD, ????????
+	unsigned int DefaultTimeReportTimeInterval;
+
+	// DWORD, ??????, < 180°.
+	unsigned int CornerPointRetransmissionAngle;
+
+	// DWORD, ????, km/h.
+	unsigned int MaxSpeed;
+
+	// WORD, ??????? ID
+  unsigned short ProvinceID;
+	
+	// WORD, ??????? ID
+	unsigned short CityID;
+
+	//STRING, ????????????????
+	unsigned char CarPlateNum[12];
+	
+	//????,?? JT/T415-2006 ? 5.4.12
+	unsigned char CarPlateColor;
+	
+	//	DWORD, ???????????????
+	unsigned int initFactoryParameters;
+	
+	//	DWORD, ??????????
+	unsigned long bootLoaderFlag;
+	
+	//STRING, ???
+	unsigned char version[5];
+	
+	
+	unsigned char PhoneNumber[20];
+	unsigned char TerminalId[20];
+};
 /**
   * @}
   */ 
@@ -160,6 +207,7 @@ void IWDG_Enable(void)
   */
 FlagStatus IWDG_GetFlagStatus(uint16_t IWDG_FLAG)
 {
+	struct TerminalParameters terminal_parameters;
   FlagStatus bitstatus = RESET;
   /* Check the parameters */
   assert_param(IS_IWDG_FLAG(IWDG_FLAG));
@@ -169,6 +217,10 @@ FlagStatus IWDG_GetFlagStatus(uint16_t IWDG_FLAG)
   }
   else
   {
+		terminal_parameters.bootLoaderFlag = 0XCCCCCCCC;
+
+		FLASH_WriteByte((uint32_t)0x08038000 , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));	
+		
     bitstatus = RESET;
   }
   /* Return the flag status */

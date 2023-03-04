@@ -274,7 +274,7 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x5000</Size>
+                <Size>0x4000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -394,6 +394,16 @@
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\usart\usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>iwdg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\iwdg.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_internal_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\bsp_internal_flash.c</FilePath>
             </File>
           </Files>
         </Group>
