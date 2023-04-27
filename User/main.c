@@ -1,8 +1,9 @@
-#include "main.h"
 #include "usart.h"
-#include "stm32f10x_flash.h"
-#include "iwdg.h"
-#include "bsp_internal_flash.h"   
+//#include "stm32f10x_flash.h"
+//#include "iwdg.h"
+#include "adc.h"
+#include "sys.h"
+//#include "bsp_internal_flash.h"   
 
 typedef  void (*pFunction)(void);
 pFunction Jump_To_Application;
@@ -40,59 +41,12 @@ bootload   app1       app2       data      total
 #define BL_SIZE 								0x4000
 #define APP_SIZE 								0x10000
 #define Application1Address    	(0x08000000+BL_SIZE)
-//#define Application2Address    	Application1Address+APP_SIZE
-#define Application2Address    	(Application1Address+APP_SIZE)
+//#define Application2Address    	(Application1Address+APP_SIZE)
+#define Application2Address    	(0x08000000+0x10000+0x4000)
 #define Application3Address    	(Application2Address+APP_SIZE)
 #define DataStorageAddress			(Application3Address+APP_SIZE)
 
 FLASH_Status FLASH_ProgramOptionByteData(uint32_t Address, uint8_t Data);
-
-
-struct TerminalParameters
-{
-	// DWORD, ????????(s).
-	unsigned int HeartBeatInterval;
-	
-	//STRING, ??????,IP ???
-	unsigned char MainServerAddress[50];
-
-	//DWORD, ??? TCP ??		
-	unsigned int ServerPort;
-
-	// DWORD, ????????
-	unsigned int DefaultTimeReportTimeInterval;
-
-	// DWORD, ??????, < 180?.
-	unsigned int CornerPointRetransmissionAngle;
-
-	// DWORD, ????, km/h.
-	unsigned int MaxSpeed;
-
-	// WORD, ??????? ID
-  unsigned short ProvinceID;
-	
-	// WORD, ??????? ID
-	unsigned short CityID;
-
-	//STRING, ????????????????
-	unsigned char CarPlateNum[12];
-	
-	//????,?? JT/T415-2006 ? 5.4.12
-	unsigned char CarPlateColor;
-	
-	//	DWORD, ???????????????
-	unsigned int initFactoryParameters;
-	
-	//	DWORD, ??????????
-	unsigned long bootLoaderFlag;
-	
-	//STRING, ???
-	unsigned char version[5];
-	
-	
-	unsigned char PhoneNumber[20];
-	unsigned char TerminalId[20];
-};
 
 uint32_t FLASH_PagesMask(__IO uint32_t Size)
 {
@@ -177,47 +131,45 @@ u8 Copy_APP2_TO_APP1(void)
 *******************************************************************************/
 int main(void)
 {
-	u8 retry=5;
-	struct TerminalParameters terminal_parameters;
-	USART3_Config(115200);
-	USART1_Config(115200);
+//	u8 retry=5;
+	u8 VoltageAD = 0;
 	
+	uart_init(115200);
 
-	IWDG_Init(6,4095); //???????64,??????625,???????1s
+
 	printf("DEBUG-->---------------------------\r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->       BOOTLOADER run!     \r\n");
 	printf("DEBUG-->                           \r\n");
 	printf("DEBUG-->---------------------------\r\n");	
 
-	Internal_ReadFlash((uint32_t) DataStorageAddress , (uint8_t *) &terminal_parameters , sizeof(terminal_parameters));
-	
 
-	printf("UpdateFlag : 0x%08lX    \r\n",terminal_parameters.bootLoaderFlag);
-	if (terminal_parameters.bootLoaderFlag == 0xAAAAAAAA)
+	Adc_Init();
+	VoltageAD = (float) (Get_Adc_Average(ADC_Channel_6,10) * 3.3 /4096) ;
+//	Get_Adc(ADC_Channel_6);
+//	VoltageAD = 0;
+//	VoltageAD = 2;
+	if (VoltageAD>1.7) 
 	{
-		printf("need to update \r\n");
-		while(retry--)
+		printf("\r\n 正常模式 \r\n");
+		printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
+		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
 		{
-			if(Copy_APP2_TO_APP1())
-			{
-				terminal_parameters.bootLoaderFlag = 0xFFFFFFFF;
-				FLASH_WriteByte(DataStorageAddress , (uint8_t*)&terminal_parameters , sizeof(terminal_parameters));
-				__set_FAULTMASK(1); 
-				NVIC_SystemReset();
-				break;
-			}
+			printf("DEBUG-->  Jump to APP1!  \r\n");
+			/* Jump to user application */
+			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
+			Jump_To_Application = (pFunction) JumpAddress;
+			/* Initialize user application's Stack Pointer */
+			__set_MSP(*(__IO uint32_t*) Application1Address);
+			Jump_To_Application();
 		}
 	}
+	
 	else
 	{
-		printf("no update \r\n");
-	}
-	
-	if ((RCC_GetFlagStatus(RCC_FLAG_PORRST) != RESET)||(RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET)) //上电复位
-	{
-		RCC_ClearFlag();
-		printf("\r\n上电复位或软件复位\r\n");
+//		Application2Address = *(__IO uint32_t*)0x08000000;
+		printf("\r\n 低功耗模式 \r\n");
+		printf("0x%08x \r\n",((*(__IO uint32_t*)Application2Address)));
 		if (((*(__IO uint32_t*)Application2Address) & 0x2FFE0000 ) == 0x20000000)
 		{
 			printf("DEBUG-->  Jump to APP2!  	\r\n");
@@ -229,37 +181,7 @@ int main(void)
 			Jump_To_Application();
 		}
 	}
-//	if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) != RESET) //软件复位
-//	{
-//		printf("\r\n软件复位 \r\n");
-//	}
-	if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) != RESET) //看门狗复位
-	{
-		RCC_ClearFlag();
-		printf("\r\n看门狗复位\r\n");
-		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
-		{
-			printf("DEBUG-->  Jump to APP1!  	\r\n");
-			/* Jump to user application */
-			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
-			Jump_To_Application = (pFunction) JumpAddress;
-			/* Initialize user application's Stack Pointer */
-			__set_MSP(*(__IO uint32_t*) Application1Address);
-			Jump_To_Application();
-		}
-	}
-//	RCC_ClearFlag();
-//	if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
-//	{
-//		printf("DEBUG-->  Jump to APP!  	\r\n");
-//		/* Jump to user application */
-//		JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
-//		Jump_To_Application = (pFunction) JumpAddress;
-//		/* Initialize user application's Stack Pointer */
-//		__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-//		Jump_To_Application();
-//	}
-	
+
 	while(1)
 	{
 	
