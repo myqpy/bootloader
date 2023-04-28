@@ -151,8 +151,9 @@ int main(void)
 //	VoltageAD = 2;
 	if (VoltageAD>1.7) 
 	{
+		GPIO_ResetBits(GPIOF, GPIO_Pin_7);
 		printf("\r\n 正常模式 \r\n");
-		printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
+//		printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
 		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
 		{
 			printf("DEBUG-->  Jump to APP1!  \r\n");
@@ -168,8 +169,9 @@ int main(void)
 	else
 	{
 //		Application2Address = *(__IO uint32_t*)0x08000000;
+		GPIO_SetBits(GPIOF, GPIO_Pin_7);
 		printf("\r\n 低功耗模式 \r\n");
-		printf("0x%08x \r\n",((*(__IO uint32_t*)Application2Address)));
+//		printf("0x%08x \r\n",((*(__IO uint32_t*)Application2Address)));
 		if (((*(__IO uint32_t*)Application2Address) & 0x2FFE0000 ) == 0x20000000)
 		{
 			printf("DEBUG-->  Jump to APP2!  	\r\n");
