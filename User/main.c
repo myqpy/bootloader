@@ -3,6 +3,7 @@
 //#include "iwdg.h"
 #include "adc.h"
 #include "sys.h"
+#include "delay.h"
 //#include "bsp_internal_flash.h"   
 
 typedef  void (*pFunction)(void);
@@ -123,6 +124,11 @@ u8 Copy_APP2_TO_APP1(void)
 	return 1;
 }
 
+void Delay(__IO uint32_t nCount)	 //简单的延时函数
+{
+	for(; nCount != 0; nCount--);
+}
+
 /*******************************************************************************
 * Function Name  : main
 * Description    : ??????
@@ -146,9 +152,11 @@ int main(void)
 
 	Adc_Init();
 	VoltageAD = (float) (Get_Adc_Average(ADC_Channel_6,10) * 3.3 /4096) ;
-//	Get_Adc(ADC_Channel_6);
-//	VoltageAD = 0;
-//	VoltageAD = 2;
+	
+	GPIO_ResetBits(GPIOB, GPIO_Pin_12);
+	Delay(10000000);
+	GPIO_SetBits(GPIOB, GPIO_Pin_12);
+
 	if (VoltageAD>1.7) 
 	{
 		GPIO_ResetBits(GPIOF, GPIO_Pin_7);
@@ -168,7 +176,6 @@ int main(void)
 	
 	else
 	{
-//		Application2Address = *(__IO uint32_t*)0x08000000;
 		GPIO_SetBits(GPIOF, GPIO_Pin_7);
 		printf("\r\n 低功耗模式 \r\n");
 //		printf("0x%08x \r\n",((*(__IO uint32_t*)Application2Address)));
@@ -183,6 +190,42 @@ int main(void)
 			Jump_To_Application();
 		}
 	}
+
+//	if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) != RESET) //看门狗复位
+//	{
+//		RCC_ClearFlag();
+//		GPIO_SetBits(GPIOF, GPIO_Pin_7);
+//		Delay(30000000);
+//		GPIO_ResetBits(GPIOF, GPIO_Pin_7);
+//		printf("\r\n看门狗复位\r\n");
+//		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
+//		{
+//			printf("DEBUG-->  Jump to APP1!  \r\n");
+//			/* Jump to user application */
+//			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
+//			Jump_To_Application = (pFunction) JumpAddress;
+//			/* Initialize user application's Stack Pointer */
+//			__set_MSP(*(__IO uint32_t*) Application1Address);
+//			Jump_To_Application();
+//		}
+//	}
+//	
+//	else
+//	{
+//		GPIO_ResetBits(GPIOF, GPIO_Pin_7);
+//		printf("\r\n 正常模式 \r\n");
+////		printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
+//		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
+//		{
+//			printf("DEBUG-->  Jump to APP1!  \r\n");
+//			/* Jump to user application */
+//			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
+//			Jump_To_Application = (pFunction) JumpAddress;
+//			/* Initialize user application's Stack Pointer */
+//			__set_MSP(*(__IO uint32_t*) Application1Address);
+//			Jump_To_Application();
+//		}
+//	}
 
 	while(1)
 	{
