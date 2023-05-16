@@ -139,7 +139,7 @@ int main(void)
 {
 //	u8 retry=5;
 	u8 VoltageAD = 0;
-	
+	uint8_t ACC = 0;
 	uart_init(115200);
 
 
@@ -157,21 +157,26 @@ int main(void)
 	Delay(10000000);
 	GPIO_SetBits(GPIOB, GPIO_Pin_12);
 
-	if (VoltageAD>1.7) 
+	ACC = (GPIO_ReadInputDataBit(GPIOD,GPIO_Pin_0));
+	printf("ACC:%02x\r\n ", ACC);
+
+	if((VoltageAD>1.7) &&  (ACC == 0) )
 	{
-		GPIO_ResetBits(GPIOF, GPIO_Pin_7);
-		printf("\r\n 正常模式 \r\n");
-//		printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
-		if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
-		{
-			printf("DEBUG-->  Jump to APP1!  \r\n");
-			/* Jump to user application */
-			JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
-			Jump_To_Application = (pFunction) JumpAddress;
-			/* Initialize user application's Stack Pointer */
-			__set_MSP(*(__IO uint32_t*) Application1Address);
-			Jump_To_Application();
-		}
+		
+			GPIO_ResetBits(GPIOF, GPIO_Pin_7);
+			printf("\r\n 正常模式 \r\n");
+//			printf("0x%08x \r\n",((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ));
+			if (((*(__IO uint32_t*)Application1Address) & 0x2FFE0000 ) == 0x20000000)
+			{
+				printf("DEBUG-->  Jump to APP1!  \r\n");
+				/* Jump to user application */
+				JumpAddress = *(__IO uint32_t*) (Application1Address + 4);
+				Jump_To_Application = (pFunction) JumpAddress;
+				/* Initialize user application's Stack Pointer */
+				__set_MSP(*(__IO uint32_t*) Application1Address);
+				Jump_To_Application();
+			}
+		
 	}
 	
 	else
